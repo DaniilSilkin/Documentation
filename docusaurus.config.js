@@ -1,179 +1,28 @@
-// @ts-check
-// `@type` JSDoc annotations allow editor autocompletion and type checking
-// (when paired with `@ts-check`).
-// There are various equivalent ways to declare your Docusaurus config.
-// See: https://docusaurus.io/docs/api/docusaurus-config
-
 import {themes as prismThemes} from 'prism-react-renderer';
-
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'My site',
-  tagline: 'Dinosaurs are cool',
-  favicon: 'img/favicon.ico',
+  title: 'Адаптивный помощник чата поддержки',
+  url: 'https://DaniilSilkin.github.io',
+  baseUrl: '/Documentation/',
+  onBrokenLinks: 'ignore',
+  onBrokenMarkdownLinks: 'warn',
+  organizationName: 'DaniilSilkin',
+  projectName: 'Documentation',
+  trailingSlash: false,
 
-  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
-  future: {
-    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+  // Включение Mermaid
+  markdown: {
+    mermaid: true,
   },
-
-  // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
-
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
-
-  onBrokenLinks: 'throw',
-
-  // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang. For example, if your site is Chinese, you
-  // may want to replace "en" with "zh-Hans".
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
-
-  presets: [
-    [
-    'redocusaurus',
-      {
-        specs: [{
-          id: 'api',
-          spec: 'C:\Users\Daniil\Downloads\openapi (2).yaml', // Путь к вашему файлу спецификации
-          route: '/api/',
-        }],
-      },
-    ],
-
-    [
-      'classic',
-      /** @type {import('@docusaurus/preset-classic').Options} */
-      ({
-        docs: {
-          sidebarPath: './sidebars.js',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-        },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
-        theme: {
-          customCss: './src/css/custom.css',
-        },
-      }),
-    ],
-  ],
-
-  themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
-    ({
-      // Replace with your project's social card
-      image: 'img/docusaurus-social-card.jpg',
-      colorMode: {
-        respectPrefersColorScheme: true,
-      },
-      navbar: {
-        title: 'My Site',
-        logo: {
-          alt: 'My Site Logo',
-          src: 'img/logo.svg',
-        },
-        items: [
-          {
-            type: 'docSidebar',
-            sidebarId: 'tutorialSidebar',
-            position: 'left',
-            label: 'Tutorial',
-          },
-          {to: '/blog', label: 'Blog', position: 'left'},
-          {
-            href: 'https://github.com/facebook/docusaurus',
-            label: 'GitHub',
-            position: 'right',
-          },
-        ],
-      },
-      footer: {
-        style: 'dark',
-        links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Tutorial',
-                to: '/docs/intro',
-              },
-            ],
-          },
-          {
-            title: 'Community',
-            items: [
-              {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-              },
-              {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
-              },
-              {
-                label: 'X',
-                href: 'https://x.com/docusaurus',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'Blog',
-                to: '/blog',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/facebook/docusaurus',
-              },
-            ],
-          },
-        ],
-        copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
-      },
-      prism: {
-        theme: prismThemes.github,
-        darkTheme: prismThemes.dracula,
-      },
-    }),
-};
-
-export default {
-  title: 'Название вашей документации', // <-- Обязательно: заголовок сайта
-  url: 'https://DaniilSilkin.github.io', // <-- Обязательно: ваш GitHub URL (без слеша в конце)
-  baseUrl: '/Documentation/', // <-- Обязательно: название вашего репозитория в слешах (например, '/репозиторий/')
   
-  // ... остальные настройки (организация, проект и т.д.)
-  organizationName: 'DaniilSilkin', // Ваш логин на GitHub
-  projectName: 'Documentation', // Название репозитория
+  // Подключение темы Mermaid
+  themes: ['@docusaurus/theme-mermaid'],
+
+  i18n: {
+    defaultLocale: 'ru',
+    locales: ['ru'],
+  },
 
   presets: [
     [
@@ -181,11 +30,93 @@ export default {
       {
         docs: {
           sidebarPath: './sidebars.js',
+          routeBasePath: '/docs',
+          editUrl: 'https://github.com/DaniilSilkin/Documentation/edit/main/',
         },
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
       },
     ],
   ],
+
+  themeConfig: {
+    image: 'img/docusaurus-social-card.jpg',
+    colorMode: {
+      respectPrefersColorScheme: true,
+    },
+    
+    // Настройка темы Mermaid
+    mermaid: {
+      theme: { light: 'neutral', dark: 'dark' },
+      options: {
+        flowchart: {
+          useMaxWidth: true,
+          htmlLabels: true,
+        },
+      },
+    },
+    
+    navbar: {
+      title: 'Адаптивный помощник',
+      logo: {
+        alt: 'Logo',
+        src: 'img/logo.svg',
+      },
+      items: [
+        {
+          type: 'docSidebar',
+          sidebarId: 'docs',
+          position: 'left',
+          label: 'Документация',
+        },
+        {
+          href: 'https://github.com/DaniilSilkin/Documentation',
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
+    },
+    
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: 'Документация',
+          items: [
+            {
+              label: 'Введение',
+              to: '/docs/intro',
+            },
+            {
+              label: 'Функциональные требования',
+              to: '/docs/functional-requirements',
+            },
+            {
+              label: 'Нефункциональные требования',
+              to: '/docs/non-functional-requirements',
+            },
+          ],
+        },
+        {
+          title: 'Ресурсы',
+          items: [
+            {
+              label: 'GitHub',
+              href: 'https://github.com/DaniilSilkin/Documentation',
+            },
+          ],
+        },
+      ],
+      copyright: `Copyright © ${new Date().getFullYear()} Адаптивный помощник. Сделано с Docusaurus.`,
+    },
+    
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+    },
+  },
 };
+
+export default config;

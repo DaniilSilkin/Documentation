@@ -1,0 +1,564 @@
+---
+sidebar_position: 5
+title: Выбор технологий хранения данных
+description: Анализ и обоснование выбора технологий хранения для базы данных SupportDB
+---
+
+# Выбор технологий хранения данных
+
+## 1. Определение сущностей
+
+### 1.1 Сущности и их атрибуты
+
+#### **users** - Пользователи системы
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_user | SERIAL | NOT NULL | Уникальный идентификатор пользователя |
+| username | VARCHAR(100) | NOT NULL | Логин пользователя |
+| email | VARCHAR(150) | NOT NULL | Email для аутентификации |
+| password_hash | VARCHAR(255) | NOT NULL | Хеш пароля |
+| first_name | VARCHAR(100) | NOT NULL | Имя клиента |
+| last_name | VARCHAR(100) | NOT NULL | Фамилия клиента |
+| middle_name | VARCHAR(100) | NULL | Отчество клиента |
+| full_name | VARCHAR(300) | STORED | Полное имя (генерируется автоматически) |
+| updated_at | TIMESTAMP | NOT NULL | Дата обновления записи |
+
+**Акторы:** Админ (создание/редактирование), Оператор (чтение своего профиля), Система (автоматическое обновление last_login)
+
+**Характер данных:** Транзакционные (CRUD операции)
+
+---
+
+#### **user_roles** - Роли пользователей
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_user | INTEGER | NOT NULL | Ссылка на пользователя (FK → users.id_user) |
+| role_name | VARCHAR(50) | NOT NULL | Роль (operator/admin/supervisor) |
+| description | TEXT | NULL | Описание роли |
+| assigned_at | TIMESTAMP | NOT NULL | Дата назначения роли |
+| assigned_by | INTEGER | NULL | Кто назначил роль (FK → users.id_user) |
+
+**Акторы:** Админ (назначение ролей), Система (проверка прав доступа)
+
+**Характер данных:** Справочные + Транзакционные
+
+---
+
+#### **clients** - Клиенты (пользователи чата поддержки)
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_client | SERIAL | NOT NULL | Уникальный идентификатор клиента |
+| email | VARCHAR(150) | NOT NULL | Email клиента (уникальный) |
+| phone | VARCHAR(20) | NOT NULL | Телефон клиента (уникальный) |
+| first_name | VARCHAR(100) | NOT NULL | Имя клиента |
+| last_name | VARCHAR(100) | NOT NULL | Фамилия клиента |
+| middle_name | VARCHAR(100) | NULL | Отчество клиента |
+| full_name | VARCHAR(300) | STORED | Полное имя (генерируется автоматически) |
+| alternative_emails | TEXT[] | NULL | Массив дополнительных email'ов |
+| alternative_phones | TEXT[] | NULL | Массив дополнительных телефонов |
+| preferred_language | VARCHAR(10) | NOT NULL | Предпочитаемый язык (по умолч. 'ru') |
+| total_sessions | INTEGER | NOT NULL | Общее количество сессий (денормализовано) |
+| total_messages | INTEGER | NOT NULL | Общее количество сообщений (денормализовано) |
+| first_contact | TIMESTAMP | NULL | Дата первого обращения |
+| last_contact | TIMESTAMP | NULL | Дата последнего обращения |
+| lifetime_value | DECIMAL(10,2) | NOT NULL | LTV клиента в рублях (по умолч. 0) |
+| satisfaction_avg | FLOAT | NOT NULL | Средняя оценка удовлетворённости (по умолч. 0) |
+| complaint_count | INTEGER | NOT NULL | Количество жалоб (по умолч. 0) |
+| escalation_count | INTEGER | NOT NULL | Количество эскалаций (по умолч. 0) |
+| tags | TEXT[] | NOT NULL | Теги клиента (массив) |
+| is_blocked | BOOLEAN | NOT NULL | Заблокирован ли клиент (по умолч. FALSE) |
+| block_reason | TEXT | NULL | Причина блокировки |
+| blocked_at | TIMESTAMP | NULL | Дата блокировки |
+| blocked_by | INTEGER | NULL | Кто заблокировал (FK → users.id_user) |
+| created_at | TIMESTAMP | NOT NULL | Дата создания записи |
+| updated_at | TIMESTAMP | NOT NULL | Дата обновления записи |
+
+**Акторы:** Клиент (создание через чат), Система (автоматическое обновление статистики), Админ (редактирование/блокировка), Аналитик (просмотр)
+
+**Характер данных:** Транзакционные + Аналитические
+
+**Ограничения:**
+- Клиент должен иметь хотя бы один контакт (email или phone)
+- Email должен соответствовать формату (если указан)
+- Телефон должен соответствовать формату (если указан)
+
+---
+
+#### **chat_sessions** - Сессии чатов
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_session | SERIAL | NOT NULL | Уникальный ID сессии |
+| id_client | INTEGER | NULL | Ссылка на клиента (FK → clients.id_client) |
+| id_user | INTEGER | NOT NULL | Оператор, ведущий чат (FK → users.id_user) |
+| session_start | TIMESTAMP | NOT NULL | Время начала сессии |
+| session_end | TIMESTAMP | NULL | Время окончания сессии |
+| channel | VARCHAR(50) | NOT NULL | Канал обращения (web_chat/mobile/telegram/email) |
+| status | VARCHAR(20) | NOT NULL | Статус (active/closed/transferred/pending) |
+| source_url | VARCHAR(500) | NULL | URL страницы обращения |
+| user_agent | TEXT | NULL | Браузер/устройство клиента |
+| priority | INTEGER | NOT NULL | Приоритет (1-5, по умолч. 1) |
+| tags | TEXT[] | NULL | Теги сессии |
+| rating | INTEGER | NULL | Оценка клиента (1-5) |
+| feedback | TEXT | NULL | Отзыв клиента |
+
+**Акторы:** Клиент (создание), Оператор (обновление статуса), Админ (просмотр), Система (автоматическое закрытие)
+
+**Характер данных:** Транзакционные
+
+---
+
+#### **chat_messages** - Сообщения чата
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_message | SERIAL | NOT NULL | Уникальный ID сообщения |
+| id_session | INTEGER | NOT NULL | Сессия чата (FK → chat_sessions.id_session) |
+| id_client | INTEGER | NULL | Ссылка на клиента (FK → clients.id_client) |
+| message_text | TEXT | NOT NULL | Текст сообщения |
+| sender_type | VARCHAR(20) | NOT NULL | Тип отправителя (client/operator/bot/system) |
+| sender_id | INTEGER | NULL | ID отправителя для оператора (FK → users.id_user) |
+| message_time | TIMESTAMP | NOT NULL | Время отправки |
+| is_read | BOOLEAN | NOT NULL | Прочитано ли сообщение (по умолч. FALSE) |
+| read_at | TIMESTAMP | NULL | Время прочтения |
+| attachments | JSONB | NOT NULL | Вложения (массив URL) |
+| metadata | JSONB | NOT NULL | Дополнительная метаинформация |
+
+**Акторы:** Клиент (отправка), Оператор (отправка/чтение), Бот (автоответы), Система (логирование)
+
+**Характер данных:** Транзакционные (высокая интенсивность записи)
+
+---
+
+#### **sentiment_analysis** - Анализ тональности
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_analysis | SERIAL | NOT NULL | Уникальный ID анализа |
+| id_message | INTEGER | NOT NULL | Сообщение (FK → chat_messages.id_message, UNIQUE) |
+| id_client | INTEGER | NULL | Ссылка на клиента (FK → clients.id_client) |
+| sentiment_label | VARCHAR(20) | NOT NULL | Оценка (positive/negative/neutral/angry/frustrated) |
+| sentiment_score | FLOAT | NOT NULL | Числовая оценка (-1..1) |
+| confidence | FLOAT | NOT NULL | Уверенность анализа (0..1) |
+| urgency_level | INTEGER | NULL | Уровень срочности (1-5) |
+| topics | TEXT[] | NULL | Темы сообщения (массив) |
+| emotions | JSONB | NULL | Детектированные эмоции |
+| key_phrases | TEXT[] | NULL | Ключевые фразы |
+| analyzed_at | TIMESTAMP | NOT NULL | Время анализа |
+
+**Акторы:** Система (автоматический анализ), Оператор (просмотр), Админ (аналитика)
+
+**Характер данных:** Транзакционные + Аналитические
+
+---
+
+#### **recommendations** - Рекомендации оператору
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_recommendation | SERIAL | NOT NULL | Уникальный ID рекомендации |
+| id_session | INTEGER | NOT NULL | Сессия чата (FK → chat_sessions.id_session) |
+| id_user | INTEGER | NOT NULL | Оператор (FK → users.id_user) |
+| recommendation_text | TEXT | NOT NULL | Текст рекомендации |
+| recommendation_type | VARCHAR(50) | NOT NULL | Тип (empathy/escalate/info/transfer/tone_change/high_priority) |
+| priority | INTEGER | NOT NULL | Приоритет (1-5) |
+| confidence_score | FLOAT | NOT NULL | Уверенность (0..1) |
+| suggested_actions | JSONB | NULL | Предлагаемые действия |
+| is_applied | BOOLEAN | NOT NULL | Применена ли (по умолч. FALSE) |
+| applied_at | TIMESTAMP | NULL | Время применения |
+| is_dismissed | BOOLEAN | NOT NULL | Отклонена ли (по умолч. FALSE) |
+| dismissed_at | TIMESTAMP | NULL | Время отклонения |
+| dismissed_by | INTEGER | NULL | Кто отклонил (FK → users.id_user) |
+| feedback_score | INTEGER | NULL | Оценка полезности (1-5) |
+| feedback_comment | TEXT | NULL | Комментарий |
+| created_at | TIMESTAMP | NOT NULL | Время создания |
+| expires_at | TIMESTAMP | NULL | Время истечения |
+
+**Акторы:** Система (генерация), Оператор (просмотр/применение/отклонение)
+
+**Характер данных:** Транзакционные (с высокой скоростью создания)
+
+---
+
+#### **company_charter** - Устав организации
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_rule | SERIAL | NOT NULL | Уникальный ID правила |
+| rule_code | VARCHAR(50) | NOT NULL | Уникальный код правила |
+| rule_title | VARCHAR(200) | NOT NULL | Заголовок правила |
+| rule_text | TEXT | NOT NULL | Полный текст правила |
+| priority_level | INTEGER | NOT NULL | Приоритет (1-10) |
+| is_active | BOOLEAN | NOT NULL | Активно ли правило (по умолч. TRUE) |
+| version | INTEGER | NOT NULL | Версия правила (по умолч. 1) |
+| effective_from | DATE | NOT NULL | Дата начала действия |
+| effective_to | DATE | NULL | Дата окончания действия |
+| created_by | INTEGER | NULL | Кто создал (FK → users.id_user) |
+| created_at | TIMESTAMP | NOT NULL | Дата создания |
+| updated_at | TIMESTAMP | NOT NULL | Дата обновления |
+
+**Акторы:** Админ (CRUD), Оператор (чтение), Система (автоматическая проверка)
+
+**Характер данных:** Справочные (редко изменяемые)
+
+---
+
+#### **knowledge_base** - База знаний
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_article | SERIAL | NOT NULL | Уникальный ID статьи |
+| title | VARCHAR(200) | NOT NULL | Заголовок статьи |
+| content | TEXT | NOT NULL | Содержимое статьи |
+| category | VARCHAR(100) | NOT NULL | Категория |
+| tags | TEXT[] | NULL | Теги (массив) |
+| created_by | INTEGER | NULL | Кто создал (FK → users.id_user) |
+| created_at | TIMESTAMP | NOT NULL | Дата создания |
+| updated_at | TIMESTAMP | NOT NULL | Дата обновления |
+
+**Акторы:** Клиент (чтение), Оператор (чтение), Админ (CRUD), Система (обновление статистики)
+
+**Характер данных:** Справочные (в основном чтение)
+
+---
+
+#### **response_templates** - Шаблоны ответов
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_template | SERIAL | NOT NULL | Уникальный ID шаблона |
+| template_code | VARCHAR(50) | NOT NULL | Уникальный код шаблона |
+| template_name | VARCHAR(200) | NOT NULL | Название шаблона |
+| template_text | TEXT | NOT NULL | Текст шаблона |
+| category | VARCHAR(100) | NOT NULL | Категория |
+| subcategory | VARCHAR(100) | NULL | Подкатегория |
+| sentiment_target | VARCHAR(20) | NULL | Целевая тональность |
+| language | VARCHAR(10) | NOT NULL | Язык (ru/en, по умолч. 'ru') |
+| usage_count | INTEGER | NOT NULL | Счетчик использований (по умолч. 0) |
+| rating | FLOAT | NOT NULL | Рейтинг шаблона (по умолч. 0) |
+| is_active | BOOLEAN | NOT NULL | Активен ли (по умолч. TRUE) |
+| created_by | INTEGER | NULL | Кто создал (FK → users.id_user) |
+| created_at | TIMESTAMP | NOT NULL | Дата создания |
+| updated_at | TIMESTAMP | NOT NULL | Дата обновления |
+
+**Акторы:** Оператор (чтение/использование), Админ (CRUD), Система (обновление статистики)
+
+**Характер данных:** Справочные
+
+---
+
+#### **trigger_keywords** - Ключевые слова-триггеры
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_trigger | SERIAL | NOT NULL | Уникальный ID триггера |
+| keyword | VARCHAR(100) | NOT NULL | Ключевое слово |
+| category | VARCHAR(100) | NOT NULL | Категория |
+| action_type | VARCHAR(50) | NOT NULL | Тип действия (escalate/alert/tag/auto_response) |
+| action_data | JSONB | NULL | Дополнительные параметры действия |
+| priority | INTEGER | NOT NULL | Приоритет (1-5) |
+| is_active | BOOLEAN | NOT NULL | Активен ли (по умолч. TRUE) |
+| created_by | INTEGER | NULL | Кто создал (FK → users.id_user) |
+| created_at | TIMESTAMP | NOT NULL | Дата создания |
+
+**Акторы:** Админ (CRUD), Система (автоматическая проверка)
+
+**Характер данных:** Справочные
+
+---
+
+#### **audit_log** - Аудиторский лог
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_log | SERIAL | NOT NULL | Уникальный ID записи |
+| id_user | INTEGER | NULL | Пользователь |
+| action | VARCHAR(100) | NOT NULL | Выполненное действие |
+| entity_type | VARCHAR(50) | NOT NULL | Тип сущности |
+| entity_id | INTEGER | NULL | ID сущности |
+| old_values | JSONB | NULL | Старые значения |
+| new_values | JSONB | NULL | Новые значения |
+| ip_address | INET | NULL | IP-адрес |
+| user_agent | TEXT | NULL | Браузер/устройство |
+| created_at | TIMESTAMP | NOT NULL | Время события |
+
+**Акторы:** Система (автоматическая запись), Админ (просмотр)
+
+**Характер данных:** Аналитические (только вставка, никогда не изменяется)
+
+---
+
+#### **daily_stats** - Ежедневная статистика
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| stat_date | DATE | NOT NULL | Даты, дата статистики (PRIMARY KEY) |
+| active_sessions | INTEGER | NOT NULL | Активных сессий (по умолч. 0) |
+| avg_response_time_seconds | FLOAT | NULL | Среднее время ответа (секунды) |
+| avg_satisfaction_rating | FLOAT | NULL | Средняя оценка |
+| escalated_sessions | INTEGER | NOT NULL | Эскалированных сессий (по умолч. 0) |
+| avg_sentiment_score | FLOAT | NULL | Средняя тональность |
+| created_at | TIMESTAMP | NOT NULL | Время создания |
+| updated_at | TIMESTAMP | NOT NULL | Время обновления |
+
+**Акторы:** Система (автоматическое агрегирование), Админ/Аналитик (просмотр)
+
+**Характер данных:** Аналитические (агрегированные)
+
+---
+
+#### **operator_stats** - Статистика операторов
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| id_stat | SERIAL | NOT NULL | Уникальный ID записи |
+| id_user | INTEGER | NOT NULL | Оператор (FK → users.id_user) |
+| stat_date | DATE | NOT NULL | Дата статистики, дата |
+| sessions_handled | INTEGER | NOT NULL | Обработано сессий (по умолч. 0) |
+| messages_sent | INTEGER | NOT NULL | Отправлено сообщений (по умолч. 0) |
+| avg_response_time_seconds | FLOAT | NULL | Среднее время ответа (секунды) |
+| avg_rating | FLOAT | NULL | Средняя оценка |
+| recommendations_applied | INTEGER | NOT NULL | Применено рекомендаций (по умолч. 0) |
+| escalations_made | INTEGER | NOT NULL | Сделано эскалаций (по умолч. 0) |
+
+**Акторы:** Система (автоматическое агрегирование), Админ/Оператор (просмотр)
+
+**Характер данных:** Аналитические
+
+---
+
+#### **system_settings** - Системные настройки
+
+| Атрибут | Тип | Null? | Описание |
+|---------|-----|-------|----------|
+| setting_key | VARCHAR(100) | NOT NULL | Ключ настройки (PRIMARY KEY) |
+| setting_value | TEXT | NOT NULL | Значение |
+| setting_type | VARCHAR(20) | NOT NULL | Тип (string/integer/boolean/json, по умолч. 'string') |
+| description | TEXT | NULL | Описание |
+| updated_by | INTEGER | NULL | Кто обновил (FK → users.id_user) |
+| updated_at | TIMESTAMP | NOT NULL | Время обновления |
+
+**Акторы:** Админ (обновление), Система (чтение)
+
+**Характер данных:** Справочные
+
+---
+
+### 1.2 Сводная таблица акторов
+
+| Актор | Создает | Читает | Обновляет | Удаляет |
+|-------|---------|--------|-----------|---------|
+| **Клиент** | chat_sessions, chat_messages | knowledge_base | - | - |
+| **Оператор** | chat_messages | chat_sessions, chat_messages, recommendations, response_templates, company_charter, clients | recommendations (apply/dismiss), chat_sessions (status) | - |
+| **Админ** | users, user_roles, clients, company_charter, response_templates, trigger_keywords, knowledge_base | всё | всё | users, user_roles, clients |
+| **Система** | sentiment_analysis, recommendations, daily_stats, operator_stats, audit_log | всё | clients (статистика), recommendations (expires_at), chat_sessions (status) | recommendations (TTL) |
+| **Аналитик** | - | daily_stats, operator_stats, sentiment_analysis, audit_log, clients | - | - |
+
+> **Примечание по проектированию БД:**  
+> БД может показаться избыточной (поля типа timestamp и прочие атрибуты, не нужные в первую очередь), но это сделано для заметного упрощения работы аналитики (выявления влияния адаптивного помощника на получение валидного опыта клиентом, а также выявления "виновного" в отсутствии такого опыта — оператор/система), а также для удобного масштабирования (при необходимости).  
+>
+> **Обоснование использования JSONB:**  
+> Я понимаю, что атрибуты типа JSONB могут стать слабым местом в БД при определённой нагрузке, однако они были использованы для гибкости и уменьшения громоздкости (вместо JSON можно было сделать отдельные сущности, что потребовало бы создания отдельных таблиц). Гибкость схемы: у отдельной таблицы плохая гибкость (каждое новое поле требует ALTER TABLE и миграции), у JSON же новые поля добавляются без изменения схемы. Кроме того, отдельная таблица требует множества NULL-полей или отдельных таблиц под каждый канал, а JSON позволяет использовать единую структуру, где поля зависят от канала.
+
+---
+
+## 2. Выбор технологий хранения
+
+### Анализ требований к системе
+
+**Исходные требования:**
+- Хранение информации о клиентах, операторах и сессиях чата
+- Быстрое чтение профиля сессии по ID
+- Обновление данных в реальном времени (сообщения, статусы)
+- Генерация рекомендаций для оператора (мгновенно)
+- Запуск аналитических отчетов (ежедневно)
+- Полнотекстовый поиск по сообщениям и базе знаний
+- Хранение аудита действий
+- **Поиск и идентификация клиентов по email/телефону/full_name**
+- **Аналитика по клиентам (LTV, сегментация)**
+
+---
+
+### 2.1 Технологии хранения по шагам
+
+#### Шаг 1. Объём данных
+
+| Сущность | Прогнозируемый объём | Обоснование |
+|----------|---------------------|-------------|
+| **clients** | 100 тыс - 1 млн | Уникальные клиенты, обращающиеся в поддержку |
+| **chat_messages** | 50-100 млн/год | 10 000 сообщений/день × 365 дней |
+| **chat_sessions** | 1-2 млн/год | 500 сессий/день × 365 дней |
+| **sentiment_analysis** | 50-100 млн/год | 1:1 с сообщениями |
+| **recommendations** | 5-10 млн/год | 10 рекомендаций/сессию |
+| **audit_log** | 10-20 млн/год | 100 действий/день × 365 |
+| **knowledge_base** | 1-5 тыс | Статические статьи |
+| **company_charter** | 50-200 | Статические правила |
+| **users + roles** | 100-500 | Операторы и админы |
+
+---
+
+#### Шаг 2. Паттерны записи и чтения
+
+| Сущность | Паттерн | Характеристика |
+|----------|---------|----------------|
+| **clients** | OLTP (чтение + редкое обновление) | 70% SELECT, 20% INSERT (новые клиенты), 10% UPDATE |
+| **chat_messages** | OLTP + Streaming | 90% INSERT, 10% SELECT (история чата) |
+| **chat_sessions** | OLTP | 60% INSERT, 30% UPDATE, 10% SELECT |
+| **sentiment_analysis** | Event Streaming | 99% INSERT, 1% SELECT |
+| **recommendations** | OLTP | 50% INSERT, 50% UPDATE (apply/dismiss) |
+| **knowledge_base** | OLAP (чтение) | 95% SELECT, 5% UPDATE |
+| **company_charter** | Кэш | 99% SELECT (кешируется в Redis) |
+| **daily_stats** | OLAP | 100% INSERT (агрегация) |
+| **audit_log** | Event Streaming | 100% INSERT |
+
+---
+
+#### Шаг 3. Требования к консистентности
+
+| Сущность | Требование | Обоснование |
+|----------|------------|-------------|
+| **clients** | Strong | Данные клиента должны быть точными (email, телефон, статус блокировки) |
+| **users, user_roles** | Strong | Права доступа не могут быть рассинхронизированы |
+| **chat_messages** | Strong | Клиент должен видеть все сообщения |
+| **chat_sessions** | Strong | Статус сессии должен быть точным |
+| **recommendations** | Eventual | Не критично, если рекомендация появится на 0.5 сек позже |
+| **sentiment_analysis** | Eventual | Может обработаться асинхронно |
+| **daily_stats** | Eventual | Отчёты не требуют real-time |
+| **audit_log** | Eventual | Запись в лог может быть асинхронной |
+
+---
+
+#### Шаг 4. Требования к доступности
+
+| Компонент | Требуемая доступность | Обоснование |
+|-----------|----------------------|-------------|
+| **Приём сообщений** | 99.99% | Клиент не должен видеть ошибки при отправке |
+| **Данные клиентов** | 99.9% | Без профиля клиента нельзя начать чат |
+| **Чтение истории** | 99.9% | Допустима кратковременная недоступность |
+| **Рекомендации** | 99.5% | Рекомендации — доп. функция |
+| **Аналитика** | 99% | Отчёты не критичны в real-time |
+
+---
+
+#### Шаг 5. Требования к мутабельности схемы
+
+| Сущность | Мутабельность | Обоснование |
+|----------|---------------|-------------|
+| **clients** | Низкая | Структура клиента стабильна, но могут добавляться поля (например, доп. почта) |
+| **users** | Низкая | Структура пользователя стабильна |
+| **chat_messages** | Средняя | Могут добавляться поля (например, reactions) |
+| **sentiment_analysis** | Высокая | ML модель может выдавать новые эмоции |
+| **metadata** (в сообщениях) | Высокая | Разные каналы требуют разных данных |
+| **company_charter** | Низкая | Правила меняются редко |
+
+---
+
+#### Шаг 6. Требования к транзакциям
+
+| Сценарий | Нужна транзакция? | Обоснование |
+|----------|-------------------|-------------|
+| Создание клиента + первая сессия | Да | Клиент должен быть создан атомарно с сессией |
+| Сохранение сообщения + анализ тональности | Да | Либо оба сохранены, либо ни одного |
+| Обновление клиента + обновление его сессий | Нет | Можно асинхронно |
+| Обновление статуса сессии + запись в лог | Нет | Лог можно записать асинхронно |
+| Применение рекомендации + обновление статистики | Нет | Статистика может обновиться позже |
+
+---
+
+#### Шаг 7. Требования к поиску и запросам
+
+| Тип запроса | Пример | Инструмент |
+|-------------|--------|------------|
+| **Поиск по ключу** | "Дай клиента по ID" | B-tree index |
+| **Поиск по email/телефону** | "Найди клиента по email" | **B-tree уникальный индекс** |
+| **Поиск по времени** | "Сообщения за последний час" | B-tree на timestamp |
+| **Полнотекстовый поиск** | "Найди сообщения со словом 'доставка'" | **GIN index + to_tsvector** |
+| **Поиск по клиентам** | "Найди всех VIP клиентов" | B-tree на segment, GIN на tags |
+| **Агрегация** | "Средняя тональность за день" | **TimescaleDB / ClickHouse** |
+| **Поиск по JSONB** | "Найди сообщения с device_type = 'mobile'" | **GIN index на JSONB** |
+| **Поиск по тегам** | "Сессии с тегом 'urgent'" | **GIN index на array** |
+
+---
+
+#### Шаг 8. Требования к стоимости
+
+| Параметр | Ограничение | Обоснование |
+|----------|-------------|-------------|
+| Бюджет | Низкий / Средний | Учебный/стартап проект |
+| Инфраструктура | Open-source предпочтителен | PostgreSQL, Redis, TimescaleDB |
+| Облачные сервисы | Возможны, но не обязательны | Можно на VPS за $20-50/мес |
+
+---
+
+### 2.2 Итоговая сравнительная таблица
+
+| Сущность | Объём | Паттерн | Консист. | Транзакции | Поиск | Решение |
+|----------|-------|---------|----------|------------|-------|---------|
+| **clients** | 100K - 1M | OLTP (чтение + редкое обновление) | Strong | Да (с сессиями) | B-tree (email, phone), GIN (tags) | **PostgreSQL** |
+| **users, user_roles** | < 10 тыс | OLTP | Strong | Да | B-tree | **PostgreSQL** |
+| **chat_sessions** | 1-2 млн | OLTP | Strong | Да | B-tree | **PostgreSQL** |
+| **chat_messages** | 50-100 млн | OLTP + Streaming | Strong | Да | GIN (fts) | **PostgreSQL + партиционирование** |
+| **sentiment_analysis** | 50-100 млн | Event Streaming | Eventual | Нет | B-tree | **PostgreSQL (асинхронная запись)** |
+| **recommendations** | 5-10 млн | OLTP | Eventual | Нет | B-tree | **PostgreSQL + TTL** |
+| **company_charter** | < 200 | Кэш | Strong | Да | - | **PostgreSQL + Redis** |
+| **knowledge_base** | < 5 тыс | OLAP (чтение) | Strong | Нет | Full-text | **PostgreSQL (GIN) + Elasticsearch** (опционально) |
+| **response_templates** | < 500 | Кэш | Strong | Нет | - | **PostgreSQL + Redis** |
+| **trigger_keywords** | < 200 | Кэш | Strong | Нет | - | **PostgreSQL + Redis** |
+| **audit_log** | 10-20 млн | Event Streaming | Eventual | Нет | - | **ClickHouse** (отдельно) или **TimescaleDB** |
+| **daily_stats** | 5-10 тыс | OLAP | Eventual | Нет | Агрегация | **TimescaleDB** (гипертаблица) |
+| **operator_stats** | 100-200 тыс | OLAP | Eventual | Нет | Агрегация | **TimescaleDB** (гипертаблица) |
+| **system_settings** | < 100 | Кэш | Strong | Нет | - | **PostgreSQL + Redis** |
+
+---
+
+### Диаграмма архитектуры хранения данных
+
+```mermaid
+graph TB
+    subgraph "Клиентские интерфейсы"
+        Client[Клиентский чат]
+        Operator[Панель оператора]
+        Admin[Панель администратора]
+    end
+
+    subgraph "Серверная часть (Flask)"
+        API[REST API]
+        Engine[RecommendationEngine]
+    end
+
+    subgraph "Слой хранения данных"
+        subgraph "Основное хранилище"
+            PG[(PostgreSQL)]
+        end
+        
+        subgraph "Кэширование"
+            Redis[(Redis)]
+        end
+        
+        subgraph "Очереди"
+            RabbitMQ[(RabbitMQ)]
+        end
+        
+        subgraph "Аналитика (опционально)"
+            Timescale[(TimescaleDB)]
+            ClickHouse[(ClickHouse)]
+            ES[(Elasticsearch)]
+        end
+    end
+
+    Client --> API
+    Operator --> API
+    Admin --> API
+    
+    API --> Engine
+    
+    Engine --> PG
+    Engine --> Redis
+    Engine --> RabbitMQ
+    
+    PG --> Timescale
+    PG --> ES
+    PG -.-> ClickHouse

@@ -1,0 +1,446 @@
+openapi: 3.0.0
+info:
+  title: Cashback Categories Selection API
+  description: API для выбора категорий кэшбэка на следующий месяц
+  version: 0.0.1
+servers:
+  - url: https://api.example.com/v1
+    description: Production server 
+
+security:
+  - BearerAuth: []
+
+paths:
+  /cashback/categories:
+    get:
+      summary: Получить список категорий кэшбэка
+      description: |
+        Возвращает все доступные категории с процентами кэшбэка и иконками.
+        Категории индивидуальны для пользователя.
+      tags:
+        - Categories
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 2024
+            maximum: 2030
+          description: Год (например, 2024)
+          example: 2024
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Месяц (1-12)
+          example: 10
+      responses:
+        '200':
+          description: Успешный ответ со списком категорий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesResponse'
+        '400':
+          description: Неверный формат параметров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/subscription:
+    get:
+      summary: Получить тип подписки пользователя
+      description: |
+        Возвращает тип подписки (basic/premium).
+        Пользователь идентифицируется по JWT токену (user_id из токена).
+        Кэшируется на сессию.
+      tags:
+        - User
+      responses:
+        '200':
+          description: Успешный ответ с типом подписки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cashback/user-selection:
+    get:
+      summary: Получить выбранные пользователем категории
+      description: |
+        Возвращает категории, которые пользователь уже выбрал на указанный месяц.
+        Пользователь идентифицируется по JWT токену.
+      tags:
+        - Selection
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 2024
+            maximum: 2030
+          description: Год (например, 2024)
+          example: 2024
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Месяц (1-12)
+          example: 10
+      responses:
+        '200':
+          description: Успешный ответ с выбранными категориями
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSelectionResponse'
+        '400':
+          description: Неверный формат параметров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cashback/selection:
+    post:
+      summary: Сохранить выбранные категории
+      description: |
+        Сохраняет выбор категорий на указанный месяц.
+        Пользователь идентифицируется по JWT токену (user_id из токена)
+      tags:
+        - Selection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSelectionRequest'
+      responses:
+        '201':
+          description: Выбор успешно сохранён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveSelectionResponse'
+        '400':
+          description: |
+            Ошибка валидации:
+            - неверный формат данных
+            - пустой массив категорий
+            - превышено максимальное количество категорий для вашей подписки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cashback/rating:
+    post:
+      summary: Отправить оценку категорий
+      description: |
+        Сохраняет оценку пользователя (звёзды 1–5) для предложенных категорий.
+        Пользователь идентифицируется по JWT токену.
+        Если оценка уже существует - она будет перезаписана заново.
+      tags:
+        - Rating
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequest'
+      responses:
+        '200':
+          description: Оценка успешно сохранена (или обновлена)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingResponse'
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT токен, полученный при авторизации.
+        Передаётся в заголовке: Authorization: Bearer <token>
+        Из токена извлекается user_id, поэтому отдельно его передавать не нужно.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - timestamp
+      properties:
+        code:
+          type: string
+          description: Код ошибки для программной обработки
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Человекочитаемое сообщение
+          example: "Произошла ошибка"
+        timestamp:
+          type: string
+          format: date-time
+          description: Время ошибки
+          example: "2026-10-01T12:00:00Z"
+
+    Category:
+      type: object
+      required:
+        - id
+        - name
+        - cashback_percent
+        - icon_url
+      properties:
+        id:
+          type: string
+          description: Уникальный идентификатор категории
+          example: "dining"
+        name:
+          type: string
+          description: Название категории
+          example: "Рестораны и кафе"
+        cashback_percent:
+          type: integer
+          minimum: 0
+          maximum: 30
+          description: Процент кэшбэка (целое число)
+          example: 5
+        icon_url:
+          type: string
+          format: uri
+          description: URL иконки категории (PNG/SVG)
+          example: "https://cdn.example.com/icons/dining.svg"
+
+    CategoriesResponse:
+      type: object
+      required:
+        - categories
+        - year
+        - month
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        year:
+          type: integer
+          description: Год
+          example: 2024
+        month:
+          type: integer
+          description: Месяц (1-12)
+          example: 10
+
+    SubscriptionType:
+      type: string
+      enum:
+        - basic
+        - premium
+      description: |
+        basic - максимум 3 категории
+        premium - максимум 4 категории
+
+    SubscriptionResponse:
+      type: object
+      required:
+        - subscription_type
+        - max_categories
+      properties:
+        subscription_type:
+          $ref: '#/components/schemas/SubscriptionType'
+        max_categories:
+          type: integer
+          description: Максимальное количество категорий для выбора
+          example: 4
+
+    UserSelectionResponse:
+      type: object
+      required:
+        - has_selection
+        - selected_category_ids
+      properties:
+        has_selection:
+          type: boolean
+          description: Есть ли сохранённый выбор на этот месяц
+          example: true
+        selected_category_ids:
+          type: array
+          description: Список ID выбранных категорий
+          items:
+            type: string
+          example: ["dining", "groceries"]
+        selected_at:
+          type: string
+          format: date-time
+          description: Дата сохранения выбора (только если has_selection = true)
+          example: "2024-01-15T14:30:00Z"
+
+    UserSelectionRequest:
+      type: object
+      required:
+        - selected_category_ids
+        - year
+        - month
+      properties:
+        selected_category_ids:
+          type: array
+          description: Выбранные категории (ID)
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+          example: ["dining", "groceries"]
+        year:
+          type: integer
+          minimum: 2024
+          maximum: 2030
+          description: Год, на который выбирается кэшбэк
+          example: 2024
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Месяц, на который выбирается кэшбэк (1-12)
+          example: 10
+
+    SaveSelectionResponse:
+      type: object
+      required:
+        - success
+        - saved_at
+        - selected_category_ids
+      properties:
+        success:
+          type: boolean
+          example: true
+        saved_at:
+          type: string
+          format: date-time
+          example: "2024-10-01T12:05:30Z"
+        selected_category_ids:
+          type: array
+          items:
+            type: string
+          example: ["dining", "groceries"]
+
+    RatingRequest:
+      type: object
+      required:
+        - rating
+        - year
+        - month
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Оценка от 1 до 5 звёзд
+          example: 4
+        year:
+          type: integer
+          minimum: 2024
+          maximum: 2030
+          description: Год, за который выставляется оценка
+          example: 2024
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Месяц, за который выставляется оценка (1-12)
+          example: 10
+
+    RatingResponse:
+      type: object
+      required:
+        - success
+        - rated_at
+      properties:
+        success:
+          type: boolean
+          example: true
+        rated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"

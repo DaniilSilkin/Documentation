@@ -1,0 +1,510 @@
+# Спецификация API
+
+Добро пожаловать в документацию по API **Адаптивного помощника** — интеллектуальной системы поддержки клиентов.
+
+## Базовые сведения
+
+API предоставляет доступ ко всем функциям системы:
+
+- База знаний и чат для пользователей
+- Дашборд оператора с AI-рекомендациями
+- Админ-панель для управления уставом и настройками
+
+### Базовый URL
+
+| Окружение | URL |
+|-----------|-----|
+| **Локальная разработка** | `http://localhost:5000/api` |
+| **Production** | `https://api.support-system.com/api` |
+
+### Формат ответа
+
+Все успешные ответы API обернуты в стандартную структуру:
+
+```json
+{
+  "success": true,
+  "message": "Операция выполнена успешно",
+  "data": { ... }
+}
+
+
+В случае ошибки:
+
+{
+  "success": false,
+  "error": "Описание ошибки",
+  "code": 400
+}
+
+
+Аутентификация
+API использует JWT токены для аутентификации. Токен передается в заголовке:
+
+text
+Authorization: Bearer <access_token>
+Также поддерживается аутентификация через cookie (access_token).
+
+Как получить токен:
+
+Выполните запрос POST /auth/login
+
+В ответе получите access_token и refresh_token
+
+Используйте access_token для доступа к защищенным эндпоинтам
+
+Auth
+Эндпоинты для аутентификации и управления сессией.
+
+POST /auth/login
+Аутентификация пользователя. Вход в систему. При успешной аутентификации возвращает JWT токены.
+
+Тело запроса:
+
+json
+{
+  "email": "operator@company.com",
+  "password": "password123"
+}
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "user": { ... },
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+Ошибка (401):
+
+json
+{
+  "success": false,
+  "error": "Неверный email или пароль",
+  "code": 401
+}
+POST /auth/refresh
+Обновление access токена. Используйте refresh_token, чтобы получить новый access_token.
+
+Тело запроса:
+
+json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "access_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+POST /auth/logout
+Выход из системы. Завершает текущую сессию пользователя.
+
+Требует аутентификации: bearerAuth
+
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "message": "Успешный выход"
+}
+GET /auth/me
+Получение информации о текущем пользователе.
+
+Требует аутентификации: bearerAuth
+
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "username": "operator_ivanov",
+    "email": "ivanov@company.com",
+    "full_name": "Иванов Иван Иванович",
+    "roles": ["operator", "supervisor"],
+    "is_active": true,
+    "last_login": "2024-01-15T14:30:00Z",
+    "created_at": "2024-01-01T10:00:00Z"
+  }
+}
+Knowledge (База знаний)
+Эндпоинты для работы со статьями базы знаний.
+
+GET /knowledge/categories
+Получение категорий базы знаний.
+
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "getting_started",
+      "name": "Начало работы",
+      "icon": "rocket",
+      "count": 15
+    },
+    {
+      "id": "payment",
+      "name": "Оплата",
+      "icon": "credit-card",
+      "count": 8
+    }
+  ]
+}
+GET /knowledge/articles
+Получение статей базы знаний.
+
+Параметры запроса:
+
+Параметр	Тип	По умолчанию	Описание
+category	string	—	Фильтр по категории
+limit	integer	20	Максимум записей (1-100)
+offset	integer	0	Смещение для пагинации
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id_article": 101,
+        "title": "Как зарегистрироваться в системе",
+        "content": "<p>Для регистрации перейдите...</p>",
+        "category": "getting_started",
+        "tags": ["регистрация", "аккаунт"],
+        "stats": {
+          "views_count": 1520,
+          "helpful_count": 342,
+          "not_helpful_count": 28
+        },
+        "is_published": true,
+        "created_at": "2024-01-01T10:00:00Z"
+      }
+    ],
+    "total": 45
+  }
+}
+GET /knowledge/articles/{article_id}
+Получение конкретной статьи.
+
+Параметры пути:
+
+Параметр	Тип	Описание
+article_id	integer	ID статьи
+POST /knowledge/articles/{article_id}/helpful
+Отметить статью полезной/бесполезной.
+
+Тело запроса:
+
+json
+{
+  "helpful": true
+}
+Поле	Тип	Обязательное	Описание
+helpful	boolean	true — полезно, false — бесполезно
+Chat (Чат поддержки)
+Эндпоинты для работы с чатами.
+
+POST /chat/session/start
+Начать новую сессию чата.
+
+Тело запроса:
+
+json
+{
+  "client_name": "Анна Смирнова",
+  "client_email": "anna@example.com",
+  "channel": "web_chat"
+}
+Поле	Тип	Описание
+client_name	string	Имя клиента
+client_email	string	Email клиента
+channel	string	Канал обращения (web_chat, mobile, telegram, email, whatsapp)
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "session_id": 123,
+    "session": { ... }
+  }
+}
+POST /chat/message/send
+Отправить сообщение в чат.
+
+Тело запроса:
+
+json
+{
+  "session_id": 123,
+  "message": "Здравствуйте! У меня проблема с доставкой.",
+  "attachments": ["/uploads/problem.png"]
+}
+Поле	Тип	Обязательное	Описание
+session_id	integer	ID сессии
+message	string	Текст сообщения
+attachments	array	—	Список URL вложений
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "message_id": 5678,
+    "bot_response": "Понимаю ваше беспокойство...",
+    "sentiment": {
+      "sentiment_label": "negative",
+      "sentiment_score": -0.65,
+      "urgency_level": 4,
+      "topics": ["delivery", "complaint"]
+    },
+    "recommendations": [...]
+  }
+}
+GET /chat/messages/{session_id}
+Получить историю сообщений.
+
+Параметры пути:
+
+Параметр	Тип	Описание
+session_id	integer	ID сессии
+Параметры запроса:
+
+Параметр	Тип	По умолчанию	Описание
+limit	integer	20	Максимум записей
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "session": { ... },
+    "messages": [...]
+  }
+}
+POST /chat/session/close
+Закрыть сессию чата.
+
+Тело запроса:
+
+json
+{
+  "session_id": 123,
+  "rating": 5,
+  "feedback": "Оператор очень помог!"
+}
+Поле	Тип	Описание
+session_id	integer	ID сессии
+rating	integer	Оценка от 1 до 5
+feedback	string	Текстовый отзыв
+Operator (Операторская панель)
+Эндпоинты для работы операторов. Требуют аутентификации.
+
+GET /operator/sessions
+Получить список активных сессий оператора.
+
+Параметры запроса:
+
+Параметр	Тип	По умолчанию	Описание
+limit	integer	20	Максимум записей
+POST /operator/session/{session_id}/reply
+Ответ оператора в чат.
+
+Параметры пути:
+
+Параметр	Тип	Описание
+session_id	integer	ID сессии
+Тело запроса:
+
+json
+{
+  "response": "Здравствуйте! Давайте разберемся в вашей проблеме...",
+  "recommendation_id": 890
+}
+GET /operator/recommendations/{session_id}
+Получить активные рекомендации для сессии. Возвращает список AI-рекомендаций для текущего диалога.
+
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": [
+    {
+      "id_recommendation": 890,
+      "recommendation_text": "Клиент выражает сильное недовольство. Рекомендуется проявить эмпатию и извиниться.",
+      "recommendation_type": "empathy",
+      "priority": 5,
+      "confidence_score": 0.92
+    }
+  ]
+}
+POST /operator/recommendation/apply
+Применить рекомендацию.
+
+Тело запроса:
+
+json
+{
+  "recommendation_id": 890,
+  "feedback_score": 5
+}
+POST /operator/recommendation/dismiss
+Отклонить рекомендацию.
+
+GET /operator/templates
+Получить шаблоны ответов.
+
+Параметры запроса:
+
+Параметр	Тип	Описание
+sentiment	string	Тональность (positive, negative, neutral...)
+category	string	Категория шаблона
+GET /operator/stats
+Получить личную статистику оператора.
+
+Параметры запроса:
+
+Параметр	Тип	По умолчанию	Описание
+period	string	week	Период (day, week, month)
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "sessions_count": 42,
+    "avg_response_time": 45,
+    "avg_rating": 4.8,
+    "recommendations_applied": 38
+  }
+}
+Admin (Администрирование)
+Эндпоинты для администраторов. Требуют аутентификации и прав admin/supervisor.
+
+Управление уставом (/admin/charter)
+GET /admin/charter
+Получить все правила устава.
+
+POST /admin/charter
+Добавить новое правило.
+
+Тело запроса:
+
+json
+{
+  "rule_code": "COMM_001",
+  "rule_title": "Вежливость и уважение",
+  "rule_text": "Все сотрудники обязаны общаться вежливо...",
+  "category": "communication",
+  "priority_level": 10,
+  "is_mandatory": true
+}
+PUT /admin/charter/{rule_id}
+Обновить правило.
+
+DELETE /admin/charter/{rule_id}
+Удалить правило.
+
+POST /admin/charter/import
+Массовый импорт правил из JSON.
+
+Управление пользователями (/admin/users)
+GET /admin/users
+Получить список пользователей.
+
+POST /admin/users
+Создать нового пользователя.
+
+PUT /admin/users/{user_id}
+Редактировать пользователя.
+
+Управление триггерами (/admin/keywords)
+GET /admin/keywords
+Получить список триггерных слов.
+
+POST /admin/keywords
+Добавить триггерное слово.
+
+Аналитика (/admin/analytics)
+GET /admin/analytics
+Получить аналитику системы.
+
+Параметры запроса:
+
+Параметр	Тип	Описание
+date_from	date	Начало периода (YYYY-MM-DD)
+date_to	date	Конец периода
+Успешный ответ (200):
+
+json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "total_sessions": 1250,
+      "total_messages": 8750,
+      "avg_sentiment": 0.35,
+      "satisfaction_rate": 0.87
+    },
+    "sentiment_trend": [...],
+    "top_topics": [...],
+    "operator_ranking": [...]
+  }
+}
+Справочник типов данных
+Роли пользователей (UserRole)
+Значение	Описание
+user	Обычный пользователь
+operator	Оператор поддержки
+supervisor	Супервизор
+admin	Администратор
+Статусы сессии (SessionStatus)
+Значение	Описание
+active	Активна
+closed	Закрыта
+transferred	Передана другому оператору
+pending	Ожидает оператора
+Тональность сообщения (SentimentLabel)
+Значение	Описание
+positive	Позитивная
+negative	Негативная
+neutral	Нейтральная
+angry	Гнев
+frustrated	Разочарование
+Типы рекомендаций (RecommendationType)
+Значение	Описание
+empathy	Проявить эмпатию
+escalate	Эскалировать
+info	Предоставить информацию
+transfer	Передать другому специалисту
+tone_change	Сменить тон
+high_priority	Высокий приоритет
+positive_reinforcement	Позитивное подкрепление
+repetition_alert	Предупреждение о повторении
+Категории правил устава (RuleCategory)
+Значение	Описание
+communication	Коммуникация
+refund	Возвраты
+delivery	Доставка
+privacy	Конфиденциальность
+complaint	Жалобы
+technical	Технические вопросы
+Коды ошибок
+Код	Описание
+401	Неверный email или пароль
+403	Недостаточно прав
+404	Ресурс не найден
+422	Ошибка валидации
+500	Внутренняя ошибка сервера
